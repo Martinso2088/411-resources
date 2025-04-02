@@ -51,15 +51,15 @@ check_db() {
 #
 ##################################################
 
-create_boxer() {
+add_boxer() {
   name=$1
   weight=$2
   height=$3
   reach=$4
   age=$5
 
-  echo "Creating boxer $name..."
-  response=$(curl -s -X POST "$BASE_URL/create-boxer" -H "Content-Type: application/json" \
+  echo "Adding boxer $name..."
+  response=$(curl -s -X POST "$BASE_URL/api/add-boxer" -H "Content-Type: application/json" \
     -d "{\"name\":\"$name\", \"weight\":$weight, \"height\":$height, \"reach\":$reach, \"age\":$age}")
 
   echo "Response: $response"  # <-- Add this line to print API response
@@ -73,11 +73,11 @@ create_boxer() {
 }
 
 
-delete_boxer_by_id() {
+delete_boxer() {
   boxer_id=$1
 
-  echo "Deleting boxer by ID ($boxer_id)..."
-  response=$(curl -s -X DELETE "$BASE_URL/delete-boxer/$boxer_id")
+  echo "Deleting boxer ($boxer_id)..."
+  response=$(curl -s -X DELETE "$BASE_URL/api/delete-boxer/<int:boxer_id>/$boxer_id")
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer deleted successfully by ID ($boxer_id)."
   else
@@ -90,7 +90,7 @@ get_boxer_by_id() {
   boxer_id=$1
 
   echo "Getting boxer by ID ($boxer_id)..."
-  response=$(curl -s -X GET "$BASE_URL/get-boxer-by-id/$boxer_id")
+  response=$(curl -s -X GET "$BASE_URL/api/get-boxer-by-id/<int:boxer_id>$boxer_id")
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer retrieved successfully by ID ($boxer_id)."
     if [ "$ECHO_JSON" = true ]; then
@@ -107,7 +107,7 @@ get_boxer_by_name() {
   boxer_name=$1
 
   echo "Getting boxer by name ($boxer_name)..."
-  response=$(curl -s -X GET "$BASE_URL/get-boxer-by-name/$boxer_name")
+  response=$(curl -s -X GET "$BASE_URL/api/get-boxer-by-name/<string:boxer_name>$boxer_name")
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer retrieved successfully by name ($boxer_name)."
     if [ "$ECHO_JSON" = true ]; then
@@ -126,25 +126,23 @@ get_boxer_by_name() {
 #
 ##################################################
 
-create_fight() {
-  boxer_1_id=$1
-  boxer_2_id=$2
-
-  echo "Starting fight between boxer $boxer_1_id and boxer $boxer_2_id..."
-  response=$(curl -s -X POST "$BASE_URL/start-fight" -H "Content-Type: application/json" \
-    -d "{\"boxer_1_id\":$boxer_1_id, \"boxer_2_id\":$boxer_2_id}")
-
-  if echo "$response" | grep -q '"status": "success"'; then
-    echo "Fight started successfully."
+fight() {
+  echo "Starting a fight"
+  response=$(curl -s -X GET "$BASE_URL/fight")
+  echo "$response" | grep -q '"status": "success"'
+  if [ $? -eq 0 ]; then
+    echo "Fight executed successfully."
     if [ "$ECHO_JSON" = true ]; then
-      echo "Fight result JSON:"
+      echo "Fight result after JSON:"
       echo "$response" | jq .
     fi
   else
-    echo "Failed to start fight."
+    echo "Fight could not start correctly"
+    echo "$response"
     exit 1
   fi
 }
+
 
 get_leaderboard() {
   sort_by=$1
