@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the base URL for the Flask API
-BASE_URL="http://localhost:5001/api"
+BASE_URL="http://localhost:5000/api"
 
 # Flag to control whether to echo JSON output
 ECHO_JSON=false
@@ -59,16 +59,19 @@ create_boxer() {
   age=$5
 
   echo "Creating boxer $name..."
-  curl -s -X POST "$BASE_URL/create-boxer" -H "Content-Type: application/json" \
-    -d "{\"name\":\"$name\", \"weight\":$weight, \"height\":$height, \"reach\":$reach, \"age\":$age}" | grep -q '"status": "success"'
+  response=$(curl -s -X POST "$BASE_URL/create-boxer" -H "Content-Type: application/json" \
+    -d "{\"name\":\"$name\", \"weight\":$weight, \"height\":$height, \"reach\":$reach, \"age\":$age}")
 
-  if [ $? -eq 0 ]; then
+  echo "Response: $response"  # <-- Add this line to print API response
+
+  if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer $name created successfully."
   else
     echo "Failed to create boxer $name."
     exit 1
   fi
 }
+
 
 delete_boxer_by_id() {
   boxer_id=$1
