@@ -250,30 +250,22 @@ def get_boxer_by_id(boxer_id: int) -> Response:
 
 @app.route('/api/get-boxer-by-name/<string:boxer_name>', methods=['GET'])
 def get_boxer_by_name(boxer_name: str) -> Response:
-    """Route to get a boxer by its name.
-
-    Path Parameter:
-        - boxer_name (str): The name of the boxer.
-
-    Returns:
-        JSON response containing the boxer details if found.
-
-    Raises:
-        400 error if the boxer name is missing or not found.
-        500 error if there is an issue retrieving the boxer from the database.
-
-    """
+    """Route to get a boxer by its name."""
     try:
-        app.logger.info(f"Received request to retrieve boxer with name '{boxer_name}'")
+        # Decode URL-encoded characters and clean the name
+        from urllib.parse import unquote
+        cleaned_name = unquote(boxer_name).strip()
+        
+        app.logger.info(f"Received request to retrieve boxer with name '{cleaned_name}'")
 
-        boxer = boxers_model.get_boxer_by_name(boxer_name)
+        boxer = boxers_model.get_boxer_by_name(cleaned_name)
 
         if not boxer:
-            app.logger.warning(f"Boxer '{boxer_name}' not found.")
+            app.logger.warning(f"Boxer '{cleaned_name}' not found.")
             return make_response(jsonify({
                 "status": "error",
-                "message": f"Boxer '{boxer_name}' not found"
-            }), 400)
+                "message": f"Boxer '{cleaned_name}' not found"
+            }), 404)
 
         app.logger.info(f"Successfully retrieved boxer: {boxer}")
         return make_response(jsonify({
