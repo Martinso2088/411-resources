@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the base URL for the Flask API
-BASE_URL="http://localhost:5000/api"
+BASE_URL="http://localhost:5001/api"
 
 # Flag to control whether to echo JSON output
 ECHO_JSON=false
@@ -51,33 +51,33 @@ check_db() {
 #
 ##################################################
 
-add_boxer() {
-  name=$1
+create_boxer() {
+  # Sanitize the name input
+  name=$(echo "$1" | tr -d '\r\n' | xargs)
   weight=$2
   height=$3
   reach=$4
   age=$5
 
-  echo "Adding boxer $name..."
-  response=$(curl -s -X POST "$BASE_URL/api/add-boxer" -H "Content-Type: application/json" \
+  echo "Creating boxer $name..."
+  response=$(curl -s -X POST "$BASE_URL/add-boxer" -H "Content-Type: application/json" \
     -d "{\"name\":\"$name\", \"weight\":$weight, \"height\":$height, \"reach\":$reach, \"age\":$age}")
-
-  echo "Response: $response"  # <-- Add this line to print API response
 
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer $name created successfully."
   else
     echo "Failed to create boxer $name."
+    echo "Response: $response"
     exit 1
   fi
 }
 
 
-delete_boxer() {
+delete_boxer_by_id() {
   boxer_id=$1
 
-  echo "Deleting boxer ($boxer_id)..."
-  response=$(curl -s -X DELETE "$BASE_URL/api/delete-boxer/<int:boxer_id>/$boxer_id")
+  echo "Deleting boxer by ID ($boxer_id)..."
+  response=$(curl -s -X DELETE "$BASE_URL/delete-boxer/$boxer_id")
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer deleted successfully by ID ($boxer_id)."
   else
@@ -90,7 +90,7 @@ get_boxer_by_id() {
   boxer_id=$1
 
   echo "Getting boxer by ID ($boxer_id)..."
-  response=$(curl -s -X GET "$BASE_URL/api/get-boxer-by-id/<int:boxer_id>$boxer_id")
+  response=$(curl -s -X GET "$BASE_URL/get-boxer-by-id/$boxer_id")
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer retrieved successfully by ID ($boxer_id)."
     if [ "$ECHO_JSON" = true ]; then
@@ -104,10 +104,17 @@ get_boxer_by_id() {
 }
 
 get_boxer_by_name() {
-  boxer_name=$1
+  # Properly sanitize the input name - remove all whitespace including newlines
+  boxer_name=$(echo "$1" | tr -d '\r\n' | xargs)
+  echo "🧼 Sanitized name: '$boxer_name'"
+  
+  # URL encode the name
+  encoded_name=$(echo -n "$boxer_name" | jq -sRr @uri)
+  echo "🔗 URL encoded name: '$encoded_name'"
 
   echo "Getting boxer by name ($boxer_name)..."
-  response=$(curl -s -X GET "$BASE_URL/api/get-boxer-by-name/<string:boxer_name>$boxer_name")
+  response=$(curl -s -X GET "$BASE_URL/get-boxer-by-name/$encoded_name")
+
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Boxer retrieved successfully by name ($boxer_name)."
     if [ "$ECHO_JSON" = true ]; then
@@ -116,39 +123,63 @@ get_boxer_by_name() {
     fi
   else
     echo "Failed to get boxer by name ($boxer_name)."
+    echo "Full response: $response"
     exit 1
   fi
 }
+
+
 
 ##################################################
 #
 # Fight Simulation
 #
 ##################################################
+enter_ring() {
+  name=$1
+  echo "🚪 Entering $name into the ring..."
+  response=$(curl -s -X POST "$BASE_URL/enter-ring" -H "Content-Type: application/json" \
+    -d "{\"name\": \"$name\"}")
+  echo "$response" | grep -q '"status": "success"' && echo "$name entered the ring." || (echo "❌ Failed to enter $name." && exit 1)
+}
 
-fight() {
-  echo "Starting a fight"
+get_boxers_in_ring() {
+  echo "👀 Checking boxers currently in the ring..."
+  response=$(curl -s "$BASE_URL/get-boxers")
+  echo "$response" | grep -q '"status": "success"' && echo "Boxers retrieved." || (echo "❌ Failed to get boxers." && exit 1)
+  [ "$ECHO_JSON" = true ] && echo "$response" | jq .
+}
+
+create_fight() {
+  boxer_1_id=$1
+  boxer_2_id=$2
+
+  echo "Starting fight between boxer $boxer_1_id and boxer $boxer_2_id..."
   response=$(curl -s -X GET "$BASE_URL/fight")
-  echo "$response" | grep -q '"status": "success"'
-  if [ $? -eq 0 ]; then
-    echo "Fight executed successfully."
+
+  if echo "$response" | grep -q '"status": "success"'; then
+    echo "Fight started successfully."
     if [ "$ECHO_JSON" = true ]; then
-      echo "Fight result after JSON:"
+      echo "Fight result JSON:"
       echo "$response" | jq .
     fi
   else
-    echo "Fight could not start correctly"
-    echo "$response"
+    echo "Failed to start fight."
     exit 1
   fi
 }
 
+clear_ring() {
+  echo "🧹 Clearing boxers from the ring..."
+  response=$(curl -s -X POST "$BASE_URL/clear-boxers")
+  echo "$response" | grep -q '"status": "success"' && echo "Ring cleared." || (echo "❌ Failed to clear ring." && exit 1)
+}
 
 get_leaderboard() {
   sort_by=$1
 
   echo "Getting leaderboard sorted by $sort_by..."
-  response=$(curl -s -X GET "$BASE_URL/get-leaderboard?sort_by=$sort_by")
+  response=$(curl -s -X GET "$BASE_URL/leaderboard?sort=$sort_by")
   if echo "$response" | grep -q '"status": "success"'; then
     echo "Leaderboard retrieved successfully."
     if [ "$ECHO_JSON" = true ]; then
@@ -181,11 +212,17 @@ create_boxer "Muhammad Ali" 210 74 81 30
 get_boxer_by_name "Mike Tyson"
 get_boxer_by_id 1
 
+enter_ring "Mike Tyson"
+enter_ring "Muhammad Ali"
+get_boxers_in_ring
+
 # Simulate a fight between two boxers
 create_fight 1 2
 
 # Get the leaderboard
 get_leaderboard "wins"
+
+clear_ring
 
 # Clean up - delete the created boxers
 delete_boxer_by_id 1
